@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BYJU'S — Rise & Fall Case Study</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        surface: {
+                            primary: '#030303',
+                            secondary: '#0a0a0a',
+                            tertiary: '#111111',
+                            card: '#161616',
+                            elevated: '#1a1a1a',
+                        },
+                        accent: {
+                            red: '#ff003c',
+                            green: '#00ff9d',
+                            amber: '#ffbb00',
+                            blue: '#3b82f6',
+                            purple: '#a855f7',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #030303; color: #fff; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            opacity: 0.04; z-index: 9999; pointer-events: none;
+        }
+
+        .glass-panel {
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .glass-panel-red {
+            background: rgba(255,0,60,0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,0,60,0.1);
+        }
+
+        .glass-panel-green {
+            background: rgba(0,255,157,0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0,255,157,0.1);
+        }
+
+        .glass-panel-amber {
+            background: rgba(255,187,0,0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,187,0,0.1);
+        }
+
+        .section-reveal { opacity: 0; transform: translateY(40px); transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .section-reveal.visible { opacity: 1; transform: translateY(0); }
+
+        .stat-glow-red { text-shadow: 0 0 40px rgba(255,0,60,0.3); }
+        .stat-glow-green { text-shadow: 0 0 40px rgba(0,255,157,0.3); }
+        .stat-glow-amber { text-shadow: 0 0 40px rgba(255,187,0,0.3); }
+
+        .progress-bar { height: 3px; background: #1a1a1a; border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 2px; transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1); }
+
+        .timeline-line { position: absolute; left: 23px; top: 0; bottom: 0; width: 1px; background: linear-gradient(to bottom, rgba(255,0,60,0.4), rgba(255,255,255,0.05), rgba(0,255,157,0.4)); }
+        
+        .timeline-dot { width: 12px; height: 12px; border-radius: 50%; position: relative; z-index: 2; flex-shrink: 0; }
+        .timeline-dot-red { background: #ff003c; box-shadow: 0 0 12px rgba(255,0,60,0.5); }
+        .timeline-dot-green { background: #00ff9d; box-shadow: 0 0 12px rgba(0,255,157,0.5); }
+        .timeline-dot-amber { background: #ffbb00; box-shadow: 0 0 12px rgba(255,187,0,0.5); }
+        .timeline-dot-neutral { background: #555; box-shadow: 0 0 8px rgba(255,255,255,0.1); }
+
+        .chart-container { position: relative; }
+
+        .tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+
+        .metric-card { transition: all 0.3s ease; }
+        .metric-card:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); }
+
+        .nav-item { transition: all 0.2s ease; }
+        .nav-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
+        .nav-item.active { color: #ff003c; }
+
+        .funnel-step { position: relative; }
+        .funnel-step::after { content: '▼'; position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.2); font-size: 12px; }
+        .funnel-step:last-child::after { display: none; }
+
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,0,60,0.4); } 70% { box-shadow: 0 0 0 10px rgba(255,0,60,0); } }
+        .pulse-red { animation: pulse-red 2s infinite; }
+
+        @keyframes counter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .divider { height: 1px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent); }
+
+        .waterfall-bar { position: relative; }
+        .waterfall-bar .connector { position: absolute; right: 0; top: 50%; width: 20px; height: 1px; background: rgba(255,255,255,0.15); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #030303; }
+        ::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #333; }
+    </style>
+</head>
+<body>
+    <div class="noise-overlay"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 h-16 flex items-center px-6 backdrop-blur-xl bg-[#030303]/80 border-b border-white/[0.06]">
+        <div class="max-w-[1280px] mx-auto w-full flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-accent-red/20 flex items-center justify-center">
+                    <span class="font-display font-bold text-accent-red text-sm">B</span>
+                </div>
+                <span class="font-display font-semibold text-sm tracking-tight">CASE STUDY</span>
+                <span class="tag bg-accent-red/10 text-accent-red ml-2">POST-MORTEM</span>
+            </div>
+            <div class="hidden md:flex items-center gap-1">
+                <a href="#overview" class="nav-item px-3 py-1.5 rounded-md text-xs text-gray-400">Overview</a>
+                <a href="#timeline" class="nav-item px-3 py-1.5 rounded-md text-xs text-gray-400">Timeline</a>
+                <a href="#growth" class="nav-item px-3 py-1.5 rounded-md text-xs text-gray-400">Growth</a>
+                <a href="#business-model" class="nav-item px-3 py-1.5 rounded-md text-xs text-gray-400">Business Model</a>
+                <a href="#financials" class="nav-item px-3 py-1.5 rounded-md text-xs text-gray-400">Financials</a>
+                <a href="#downfall" class="nav-item px-3 py-1.5 rounded-md text-xs text-gray-400">Downfall</a>
+                <a href="#conclusion" class="nav-item px-3 py-1.5 rounded-md text-xs text-gray-400">Conclusion</a>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-[10px] font-mono text-gray-600">2024</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-16">
+
+        <!-- HERO -->
+        <section class="relative min-h-[90vh] flex items-center justify-center px-6 overflow-hidden">
+            <div class="absolute inset-0">
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full" style="background: radial-gradient(ellipse at center, rgba(255,0,60,0.06) 0%, transparent 70%);"></div>
+            </div>
+            <div class="relative z-10 text-center max-w-[900px] mx-auto">
+                <div class="flex items-center justify-center gap-3 mb-8">
+                    <span class="tag bg-white/[0.05] text-gray-400 border border-white/[0.08]">EdTech</span>
+                    <span class="tag bg-white/[0.05] text-gray-400 border border-white/[0.08]">India</span>
+                    <span class="tag bg-accent-red/10 text-accent-red border border-accent-red/20">Failed Unicorn</span>
+                </div>
+                <h1 class="font-display font-bold text-5xl md:text-7xl lg:text-8xl tracking-tighter leading-[0.9] mb-6">
+                    <span class="text-white">BYJU'S</span><br>
+                    <span class="text-gray-500">$22B → $225M</span>
+                </h1>
+                <p class="text-base md:text-lg text-gray-400 font-light max-w-[600px] mx-auto mb-10 leading-relaxed">
+                    How India's most celebrated EdTech startup built a $22 billion valuation on flawed unit economics, aggressive sales, and venture capital hype — then lost 99% of it.
+                </p>
+                <div class="flex flex-wrap items-center justify-center gap-6 mb-12">
+                    <div class="text-center">
+                        <div class="font-mono text-2xl font-medium text-accent-red stat-glow-red">99%</div>
+                        <div class="text-[10px] font-mono text-gray-600 mt-1 uppercase tracking-widest">Valuation Drop</div>
+                    </div>
+                    <div class="w-px h-10 bg-white/[0.08]"></div>
+                    <div class="text-center">
+                        <div class="font-mono text-2xl font-medium text-accent-red stat-glow-red">₹4,564 Cr</div>
+                        <div class="text-[10px] font-mono text-gray-600 mt-1 uppercase tracking-widest">FY21 Loss</div>
+                    </div>
+                    <div class="w-px h-10 bg-white/[0.08]"></div>
+                    <div class="text-center">
+                        <div class="font-mono text-2xl font-medium text-accent-red stat-glow-red">33,000</div>
+                        <div class="text-[10px] font-mono text-gray-600 mt-1 uppercase tracking-widest">Jobs Lost</div>
+                    </div>
+                    <div class="w-px h-10 bg-white/[0.08]"></div>
+                    <div class="text-center">
+                        <div class="font-mono text-2xl font-medium text-accent-amber stat-glow-amber">₹1.8L Cr</div>
+                        <div class="text-[10px] font-mono text-gray-600 mt-1 uppercase tracking-widest">Wealth Destroyed</div>
+                    </div>
+                </div>
+                <a href="#overview" class="inline-flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-white transition-colors">
+                    <span>SCROLL TO EXPLORE</span>
+                    <span class="iconify" data-icon="lucide:arrow-down" data-width="14"></span>
+                </a>
+            </div>
+        </section>
+
+        <!-- OVERVIEW -->
+        <section id="overview" class="px-6 py-24 md:py-32">
+            <div class="max-w-[1280px] mx-auto section-reveal">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="font-mono text-[10px] text-accent-red tracking-widest uppercase">01</span>
+                    <div class="h-px w-12 bg-accent-red/30"></div>
+                    <span class="font-mono text-[10px] text-gray-500 tracking-widest uppercase">Executive Summary</span>
+                </div>
+                <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tighter mb-8">The Story in Numbers</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+                    <div class="glass-panel rounded-xl p-6 metric-card">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="iconify text-accent-green" data-icon="lucide:trending-up" data-width="16"></span>
+                            <span class="text-[10px] font-mono text-accent-green tracking-widest uppercase">The Rise</span>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">PEAK VALUATION</div>
+                                <div class="font-mono text-xl font-medium text-white">$22 Billion</div>
+                                <div class="text-[10px] font-mono text-gray-600">March 2022</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">TOTAL FUNDING RAISED</div>
+                                <div class="font-mono text-xl font-medium text-white">~$5.8 Billion</div>
+                                <div class="text-[10px] font-mono text-gray-600">From top VCs globally</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">PEAK USERS</div>
+                                <div class="font-mono text-xl font-medium text-white">150 Million+</div>
+                                <div class="text-[10px] font-mono text-gray-600">App downloads</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">PEAK EMPLOYEES</div>
+                                <div class="font-mono text-xl font-medium text-white">58,000</div>
+                                <div class="text-[10px] font-mono text-gray-600">March 2022</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel-red rounded-xl p-6 metric-card">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="iconify text-accent-red" data-icon="lucide:trending-down" data-width="16"></span>
+                            <span class="text-[10px] font-mono text-accent-red tracking-widest uppercase">The Fall</span>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">CURRENT VALUATION</div>
+                                <div class="font-mono text-xl font-medium text-accent-red">$225 Million</div>
+                                <div class="text-[10px] font-mono text-gray-600">January 2024</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">FY21 NET LOSS</div>
+                                <div class="font-mono text-xl font-medium text-accent-red">₹4,564 Cr</div>
+                                <div class="text-[10px] font-mono text-gray-600">₹12.5 Cr / day</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">EMPLOYEES REMAINING</div>
+                                <div class="font-mono text-xl font-medium text-accent-red"><25,000</div>
+                                <div class="text-[10px] font-mono text-gray-600">57% reduction</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">LEGAL CASES</div>
+                                <div class="font-mono text-xl font-medium text-accent-red">Multiple</div>
+                                <div class="text-[10px] font-mono text-gray-600">FEMA, BCCI, US lenders</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel-amber rounded-xl p-6 metric-card">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="iconify text-accent-amber" data-icon="lucide:alert-triangle" data-width="16"></span>
+                            <span class="text-[10px] font-mono text-accent-amber tracking-widest uppercase">Red Flags</span>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">REVENUE MIX (FY21)</div>
+                                <div class="font-mono text-xl font-medium text-accent-amber">80% Tablets</div>
+                                <div class="text-[10px] font-mono text-gray-600">Only 20% from courses</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">LOAN BURDEN</div>
+                                <div class="font-mono text-xl font-medium text-accent-amber">$1.2 Billion</div>
+                                <div class="text-[10px] font-mono text-gray-600">Now in default</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">ACQUISITION OVERPAY</div>
+                                <div class="font-mono text-xl font-medium text-accent-amber">20-30%</div>
+                                <div class="text-[10px] font-mono text-gray-600">Above fair value (Aakash)</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-mono text-gray-500 mb-1">FEMA VIOLATIONS</div>
+                                <div class="font-mono text-xl font-medium text-accent-amber">₹9,000 Cr</div>
+                                <div class="text-[10px] font-mono text-gray-600">ED notice issued</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Thesis -->
+                <div class="glass-panel rounded-xl p-8 md:p-10">
+                    <div class="flex items-start gap-4">
+                        <div class="w-10 h-10 rounded-lg bg-accent-red/10 flex items-center justify-center flex-shrink-0 mt-1">
+                            <span class="iconify text-accent-red" data-icon="lucide:target" data-width="20"></span>
+                        </div>
+                        <div>
+                            <h3 class="font-display text-lg font-semibold tracking-tight mb-3">Core Thesis</h3>
+                            <p class="text-sm text-gray-400 leading-relaxed">
+                                BYJU'S was never an EdTech company in the traditional sense — it was a <span class="text-white font-medium">high-burn sales machine</span> disguised as a technology platform. The company achieved hypergrowth by prioritizing top-line revenue over unit economics, using aggressive in-person sales tactics that created an illusion of product-market fit. When COVID tailwinds reversed and the funding tap closed, the fundamental flaws in the business model — negative unit economics, 80% tablet-dependent revenue, and a flawed online-only thesis — were brutally exposed.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider max-w-[1280px] mx-auto"></div>
+
+        <!-- TIMELINE -->
+        <section id="timeline" class="px-6 py-24 md:py-32">
+            <div class="max-w-[1280px] mx-auto section-reveal">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="font-mono text-[10px] text-accent-red tracking-widest uppercase">02</span>
+                    <div class="h-px w-12 bg-accent-red/30"></div>
+                    <span class="font-mono text-[10px] text-gray-500 tracking-widest uppercase">Timeline</span>
+                </div>
+                <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tighter mb-16">18 Years in 18 Steps</h2>
+
+                <div class="relative pl-14 space-y-10 max-w-[800px]">
+                    <div class="timeline-line"></div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-neutral absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">1980</span>
+                                <span class="tag bg-white/[0.04] text-gray-500 border border-white/[0.06]">Origin</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">Byju Raveendran Born</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Born in Kerala to teacher parents. Developed deep affinity for sports and mathematics.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-neutral absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2003</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">The CAT Exam Moment</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Helped friends prepare for CAT. Took the exam himself — scored 100 percentile. Repeated in 2005. Became known as "CAT Topper."</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-green absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2006</span>
+                                <span class="tag bg-accent-green/10 text-accent-green border border-accent-green/20">Milestone</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">BYJU'S Classes Founded</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Started small CAT coaching classes. Quickly scaled to auditoriums with 1,200+ students per session. 9/10 free-class students converted to paid.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-green absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2009</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">VSAT Technology — Digital Foundation</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Used satellite-based broadcasting to reach 45 cities simultaneously. Eliminated physical presence constraint.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-green absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2011</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">Think and Learn Pvt. Ltd</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Formal company incorporation. Entered K-12 school tuition segment targeting 25 crore students.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-green absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2013</span>
+                                <span class="tag bg-accent-green/10 text-accent-green border border-accent-green/20">Funding</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">First External Funding — ₹50 Cr from Manipal Group</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Sold 26% equity for ₹50 crore (~$8M). Began mobile app development. 14,000 students packed Indira Gandhi Stadium for a math class.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-green absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2015</span>
+                                <span class="tag bg-accent-green/10 text-accent-green border border-accent-green/20">Launch</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">BYJU'S Learning App Launched + Sequoia $25M</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">App launched with high-quality video content, 3D graphics, professional musicians. Also sold preloaded tablets & SD cards. Sequoia Capital invested $25M in June.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-green absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2016</span>
+                                <span class="tag bg-accent-green/10 text-accent-green border border-accent-green/20">Funding</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">Mark Zuckerberg's CZI Invests $50M</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Chan Zuckerberg Initiative invested $50M. Massive credibility boost. Aggressive sales team hiring began.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-amber absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2018</span>
+                                <span class="tag bg-accent-amber/10 text-accent-amber border border-accent-amber/20">Unicorn</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">India's First EdTech Unicorn — $1B+ Valuation</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Achieved unicorn status. Became the poster child of India's EdTech revolution. Sales machine in full swing.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-green absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">Mar 2020</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">Pre-COVID: 4 Cr Users, $8B Valuation</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Strong growth trajectory. Then COVID hit — and everything changed.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-green absolute -left-14 top-1 pulse-red"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2020-2021</span>
+                                <span class="tag bg-accent-green/10 text-accent-green border border-accent-green/20">Hypergrowth</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">COVID Boom + Acquisition Spree</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Made classes free to acquire users. App usage +60%. EdTech funding exploded: $429M → $2,220M → $4,165M (2019→2020→2021). BYJU'S got ~50% of all funding. Acquired WhiteHat Jr ($300M), Toppr, Great Learning, Epic ($1B), Aakash Institute ($1B), and others. Took $1.2B loan.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-amber absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">Mar 2022</span>
+                                <span class="tag bg-accent-amber/10 text-accent-amber border border-accent-amber/20">Peak</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">Peak: $22B Valuation, 58,000 Employees</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">The absolute summit. But the pandemic was ending. The model was about to crack.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-red absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">Sep 2022</span>
+                                <span class="tag bg-accent-red/10 text-accent-red border border-accent-red/20">Exposed</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">FY21 Earnings Report — The Truth Emerges</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">Revenue: ₹2,428 Cr. Losses: ₹4,564 Cr. 80% revenue from tablet sales. ₹12.5 Cr daily burn. The emperor had no clothes.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-red absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">Late 2022</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">Pivot to Offline — 500 Centers Announced</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">$200M investment for 500 offline tuition centers. An implicit admission that the online-only model had failed. Switched to phone/Zoom sales — conversion rates dropped.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-red absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">2023</span>
+                                <span class="tag bg-accent-red/10 text-accent-red border border-accent-red/20">Collapse</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">Cascading Crises</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">US lenders sued for $1.2B loan default. MCA investigation started. 33,000+ employees fired. Epic sold at $500M loss. BCCI insolvency proceedings. ED notice for ₹9,000 Cr FEMA violations. Salaries delayed for months.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-5 relative">
+                        <div class="timeline-dot timeline-dot-red absolute -left-14 top-1"></div>
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="font-mono text-xs text-gray-500">Jan 2024</span>
+                                <span class="tag bg-accent-red/10 text-accent-red border border-accent-red/20">Rock Bottom</span>
+                            </div>
+                            <h4 class="font-display text-sm font-medium mb-1">Valuation Crashes to $225M</h4>
+                            <p class="text-xs text-gray-500 leading-relaxed">99% drop from $22B peak. ~₹1,80,000 crore wealth destroyed. All India offices emptied except Bengaluru. Aakash — the only profitable acquisition — is the last lifeline.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider max-w-[1280px] mx-auto"></div>
+
+        <!-- GROWTH ANALYSIS -->
+        <section id="growth" class="px-6 py-24 md:py-32">
+            <div class="max-w-[1280px] mx-auto section-reveal">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="font-mono text-[10px] text-accent-red tracking-widest uppercase">03</span>
+                    <div class="h-px w-12 bg-accent-red/30"></div>
+                    <span class="font-mono text-[10px] text-gray-500 tracking-widest uppercase">Growth Analysis</span>
+                </div>
+                <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tighter mb-4">The Valuation Rocket</h2>
+                <p class="text-sm text-gray-500 mb-12 max-w-[600px] leading-relaxed">BYJU'S valuation grew 2,750x in 9 years — far outpacing actual revenue and profit generation.</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+                    <!-- Valuation Chart -->
+                    <div class="glass-panel rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="font-display text-sm font-medium">Valuation Over Time ($B)</h3>
+                                <p class="text-[10px] font-mono text-gray-600 mt-1">2013 → 2024</p>
+                            </div>
+                            <span class="tag bg-accent-red/10 text-accent-red">↑ 2,750x at peak</span>
+                        </div>
+                        <div class="chart-container" style="height: 280px;">
+                            <canvas id="valuationChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- EdTech Funding Chart -->
+                    <div class="glass-panel rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="font-display text-sm font-medium">India EdTech Funding ($M)</h3>
+                                <p class="text-[10px] font-mono text-gray-600 mt-1">BYJU'S share vs rest of sector</p>
+                            </div>
+                            <span class="tag bg-accent-amber/10 text-accent-amber">~50% BYJU'S share</span>
+                        </div>
+                        <div class="chart-container" style="height: 280px;">
+                            <canvas id="edtechFundingChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Employee Count -->
+                <div class="glass-panel rounded-xl p-6 mb-12">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="font-display text-sm font-medium">Employee Count Trajectory</h3>
+                            <p class="text-[10px] font-mono text-gray-600 mt-1">EPFO data — March 2022 vs June 2023</p>
+                        </div>
+                        <span class="tag bg-accent-red/10 text-accent-red">-57% reduction</span>
+                    </div>
+                    <div class="chart-container" style="height: 200px;">
+                        <canvas id="employeeChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Acquisition Map -->
+                <h3 class="font-display text-xl font-semibold tracking-tight mb-6">Acquisition Spree (2020-2021)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="font-display text-sm font-medium">WhiteHat Jr</span>
+                            <span class="tag bg-white/[0.04] text-gray-400">Coding</span>
+                        </div>
+                        <div class="font-mono text-lg text-accent-red mb-1">$300M</div>
+                        <p class="text-[10px] text-gray-600">Controversial "kids coding" platform. Later faced severe backlash for mis-selling to parents.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="font-display text-sm font-medium">Aakash Institute</span>
+                            <span class="tag bg-white/[0.04] text-gray-400">Test Prep</span>
+                        </div>
+                        <div class="font-mono text-lg text-accent-red mb-1">$1B</div>
+                        <p class="text-[10px] text-gray-600">33-year-old coaching giant. Experts say 20-30% overpaid. Only profitable acquisition.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="font-display text-sm font-medium">Epic</span>
+                            <span class="tag bg-white/[0.04] text-gray-400">US Market</span>
+                        </div>
+                        <div class="font-mono text-lg text-accent-red mb-1">$1B → $500M</div>
+                        <p class="text-[10px] text-gray-600">US-based digital reading platform. Sold at 50% loss in 2023. Dead loss of $500M.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="font-display text-sm font-medium">Great Learning</span>
+                            <span class="tag bg-white/[0.04] text-gray-400">Higher Ed</span>
+                        </div>
+                        <div class="font-mono text-lg text-accent-red mb-1">$600M</div>
+                        <p class="text-[10px] text-gray-600">Professional upskilling platform. Currently in losses under BYJU'S umbrella.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="font-display text-sm font-medium">Toppr</span>
+                            <span class="tag bg-white/[0.04] text-gray-400">K-12</span>
+                        </div>
+                        <div class="font-mono text-lg text-accent-red mb-1">$150M</div>
+                        <p class="text-[10px] text-gray-600">Adaptive learning platform for K-12. Struggling post-acquisition.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="font-display text-sm font-medium">Others</span>
+                            <span class="tag bg-white/[0.04] text-gray-400">Tynker, Scholar, GradeUp</span>
+                        </div>
+                        <div class="font-mono text-lg text-accent-red mb-1">~$300M+</div>
+                        <p class="text-[10px] text-gray-600">Multiple smaller acquisitions across coding, test prep, and exam prep categories.</p>
+                    </div>
+                </div>
+                <div class="mt-6 glass-panel-amber rounded-xl p-5">
+                    <div class="flex items-center gap-3">
+                        <span class="iconify text-accent-amber" data-icon="lucide:calculator" data-width="18"></span>
+                        <div>
+                            <span class="text-sm text-accent-amber font-medium">Total Estimated Acquisition Spend: ~$2.35 Billion+</span>
+                            <p class="text-[10px] text-gray-500 mt-0.5">Most acquisitions are currently loss-making. Only Aakash Institute remains viable.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider max-w-[1280px] mx-auto"></div>
+
+        <!-- BUSINESS MODEL -->
+        <section id="business-model" class="px-6 py-24 md:py-32">
+            <div class="max-w-[1280px] mx-auto section-reveal">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="font-mono text-[10px] text-accent-red tracking-widest uppercase">04</span>
+                    <div class="h-px w-12 bg-accent-red/30"></div>
+                    <span class="font-mono text-[10px] text-gray-500 tracking-widest uppercase">Business Model</span>
+                </div>
+                <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tighter mb-4">The Sales Machine</h2>
+                <p class="text-sm text-gray-500 mb-12 max-w-[600px] leading-relaxed">A masterclass in psychological selling — but a disaster in sustainable business building.</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+                    <!-- Sales Funnel -->
+                    <div class="glass-panel rounded-xl p-6">
+                        <h3 class="font-display text-sm font-medium mb-6">The BYJU'S Sales Funnel</h3>
+                        <div class="space-y-6">
+                            <div class="funnel-step">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="font-mono text-[10px] text-gray-500 w-16">STEP 1</span>
+                                    <span class="text-xs text-gray-300">TV Ad → App Download</span>
+                                </div>
+                                <div class="progress-bar"><div class="progress-fill bg-accent-blue" style="width: 100%"></div></div>
+                                <p class="text-[10px] text-gray-600 mt-1 ml-16">Massive ad spend creates awareness and drives installs</p>
+                            </div>
+                            <div class="funnel-step">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="font-mono text-[10px] text-gray-500 w-16">STEP 2</span>
+                                    <span class="text-xs text-gray-300">Salesman Cold Call</span>
+                                </div>
+                                <div class="progress-bar"><div class="progress-fill bg-accent-blue" style="width: 60%"></div></div>
+                                <p class="text-[10px] text-gray-600 mt-1 ml-16">Follow-up call to book in-person counseling session</p>
+                            </div>
+                            <div class="funnel-step">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="font-mono text-[10px] text-gray-500 w-16">STEP 3</span>
+                                    <span class="text-xs text-gray-300">In-Person Demo</span>
+                                </div>
+                                <div class="progress-bar"><div class="progress-fill bg-accent-amber" style="width: 35%"></div></div>
+                                <p class="text-[10px] text-gray-600 mt-1 ml-16">Build rapport with child. Ask trick questions child can't answer.</p>
+                            </div>
+                            <div class="funnel-step">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="font-mono text-[10px] text-gray-500 w-16">STEP 4</span>
+                                    <span class="text-xs text-gray-300">Guilt Trigger</span>
+                                </div>
+                                <div class="progress-bar"><div class="progress-fill bg-accent-red" style="width: 25%"></div></div>
+                                <p class="text-[10px] text-gray-600 mt-1 ml-16">"If your child can't answer this, how will he perform in boards?"</p>
+                            </div>
+                            <div class="funnel-step">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="font-mono text-[10px] text-gray-500 w-16">STEP 5</span>
+                                    <span class="text-xs text-gray-300">Demo Magic Trick</span>
+                                </div>
+                                <div class="progress-bar"><div class="progress-fill bg-accent-red" style="width: 20%"></div></div>
+                                <p class="text-[10px] text-gray-600 mt-1 ml-16">Show BYJU'S video → re-ask question → child answers correctly. Parents impressed.</p>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="font-mono text-[10px] text-gray-500 w-16">STEP 6</span>
+                                    <span class="text-xs text-gray-300">Close with 50% Scholarship + 100% Refund</span>
+                                </div>
+                                <div class="progress-bar"><div class="progress-fill bg-accent-green" style="width: 18%"></div></div>
+                                <p class="text-[10px] text-gray-600 mt-1 ml-16">Artificial urgency + perceived discount = near-irresistible offer</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Revenue Mix -->
+                    <div class="glass-panel rounded-xl p-6">
+                        <h3 class="font-display text-sm font-medium mb-6">FY21 Revenue Breakdown — The Disguise</h3>
+                        <div class="chart-container mb-6" style="height: 220px;">
+                            <canvas id="revenueMixChart"></canvas>
+                        </div>
+                        <div class="glass-panel-red rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <span class="iconify text-accent-red mt-0.5" data-icon="lucide:alert-circle" data-width="16"></span>
+                                <div>
+                                    <p class="text-xs text-gray-300 font-medium mb-1">Not an EdTech Company</p>
+                                    <p class="text-[10px] text-gray-500 leading-relaxed">80% of revenue came from selling hardware (tablets preloaded with content), not from course subscriptions or streaming. BYJU'S was essentially a tablet distribution company with education content as the hook. This model has razor-thin margins and zero moat.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sales Pressure Section -->
+                <div class="glass-panel rounded-xl p-6 mb-12">
+                    <h3 class="font-display text-sm font-medium mb-6">Sales Team Pressure Cooker</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white/[0.02] rounded-lg p-4 border border-white/[0.04]">
+                            <span class="iconify text-accent-red mb-3" data-icon="lucide:clock" data-width="20"></span>
+                            <div class="font-mono text-lg text-white mb-1">14 hrs</div>
+                            <p class="text-[10px] text-gray-500">Daily shift duration in Bengaluru office</p>
+                        </div>
+                        <div class="bg-white/[0.02] rounded-lg p-4 border border-white/[0.04]">
+                            <span class="iconify text-accent-red mb-3" data-icon="lucide:utensils" data-width="20"></span>
+                            <div class="font-mono text-lg text-white mb-1">No lunch</div>
+                            <p class="text-[10px] text-gray-500">Breaks forbidden without meeting daily target</p>
+                        </div>
+                        <div class="bg-white/[0.02] rounded-lg p-4 border border-white/[0.04]">
+                            <span class="iconify text-accent-red mb-3" data-icon="lucide:target" data-width="20"></span>
+                            <div class="font-mono text-lg text-white mb-1">₹1.5L/wk</div>
+                            <p class="text-[10px] text-gray-500">Unreasonable weekly sales target per rep</p>
+                        </div>
+                        <div class="bg-white/[0.02] rounded-lg p-4 border border-white/[0.04]">
+                            <span class="iconify text-accent-red mb-3" data-icon="lucide:skull" data-width="20"></span>
+                            <div class="font-mono text-lg text-white mb-1">Fire on sight</div>
+                            <p class="text-[10px] text-gray-500">Below 50% target = immediate termination (2022 rule)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mis-selling incidents -->
+                <div class="glass-panel-red rounded-xl p-6">
+                    <h3 class="font-display text-sm font-medium text-accent-red mb-4">Reported Mis-selling Tactics</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                        <div class="flex items-center gap-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-accent-red flex-shrink-0"></span>
+                            <span class="text-xs text-gray-400">Parents pressured into buying during home visits</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-accent-red flex-shrink-0"></span>
+                            <span class="text-xs text-gray-400">False information given about refund policies</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-accent-red flex-shrink-0"></span>
+                            <span class="text-xs text-gray-400">Sales reps paying ₹15,000 from own pocket to close deals</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-accent-red flex-shrink-0"></span>
+                            <span class="text-xs text-gray-400">Customers unable to cancel subscriptions or get refunds</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-accent-red flex-shrink-0"></span>
+                            <span class="text-xs text-gray-400">Intimidation tactics used against reluctant parents</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-accent-red flex-shrink-0"></span>
+                            <span class="text-xs text-gray-400">Free class used as bait for high-pressure sales pitch</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider max-w-[1280px] mx-auto"></div>
+
+        <!-- FINANCIALS / UNIT ECONOMICS -->
+        <section id="financials" class="px-6 py-24 md:py-32">
+            <div class="max-w-[1280px] mx-auto section-reveal">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="font-mono text-[10px] text-accent-red tracking-widest uppercase">05</span>
+                    <div class="h-px w-12 bg-accent-red/30"></div>
+                    <span class="font-mono text-[10px] text-gray-500 tracking-widest uppercase">Unit Economics</span>
+                </div>
+                <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tighter mb-4">The Math That Didn't Work</h2>
+                <p class="text-sm text-gray-500 mb-12 max-w-[600px] leading-relaxed">BYJU'S burned money on every single sale. The unit economics were irreparably broken.</p>
+
+                <!-- Unit Economics Waterfall -->
+                <div class="glass-panel rounded-xl p-6 mb-12">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h3 class="font-display text-sm font-medium">Per Salesman — Monthly Unit Economics Waterfall</h3>
+                            <p class="text-[10px] font-mono text-gray-600 mt-1">Where does the money go?</p>
+                        </div>
+                        <span class="tag bg-accent-red/10 text-accent-red">NET LOSS</span>
+                    </div>
+                    <div class="chart-container" style="height: 300px;">
+                        <canvas id="unitEconChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Revenue vs Loss -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+                    <div class="glass-panel rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="font-display text-sm font-medium">FY21: Revenue vs Loss (₹ Cr)</h3>
+                                <p class="text-[10px] font-mono text-gray-600 mt-1">Apr 2020 — Mar 2021</p>
+                            </div>
+                        </div>
+                        <div class="chart-container" style="height: 250px;">
+                            <canvas id="revenueLossChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel-red rounded-xl p-6">
+                        <h3 class="font-display text-sm font-medium text-accent-red mb-6">The Burning Rate</h3>
+                        <div class="space-y-6">
+                            <div class="text-center py-6">
+                                <div class="font-mono text-5xl font-bold text-accent-red stat-glow-red mb-2">₹12.5 Cr</div>
+                                <div class="text-xs text-gray-400">Lost every single day in FY21</div>
+                            </div>
+                            <div class="divider"></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="text-center">
+                                    <div class="font-mono text-xl text-white mb-1">₹52L</div>
+                                    <div class="text-[10px] text-gray-500">Lost per hour</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="font-mono text-xl text-white mb-1">₹8.7L</div>
+                                    <div class="text-[10px] text-gray-500">Lost per minute</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="font-mono text-xl text-white mb-1">₹14.5K</div>
+                                    <div class="text-[10px] text-gray-500">Lost per second</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="font-mono text-xl text-accent-red mb-1">1.88x</div>
+                                    <div class="text-[10px] text-gray-500">Loss-to-Revenue ratio</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Key Financial Ratios -->
+                <h3 class="font-display text-xl font-semibold tracking-tight mb-6">Key Financial Metrics</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="text-[10px] font-mono text-gray-500 mb-2">LOSS-TO-REVENUE RATIO</div>
+                        <div class="font-mono text-3xl font-bold text-accent-red">1.88x</div>
+                        <p class="text-[10px] text-gray-600 mt-2">For every ₹1 earned, BYJU'S lost ₹1.88. Unsustainable by any standard.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="text-[10px] font-mono text-gray-500 mb-2">CUSTOMER ACQUISITION COST (EST.)</div>
+                        <div class="font-mono text-3xl font-bold text-accent-amber">~₹16K</div>
+                        <p class="text-[10px] text-gray-600 mt-2">High CAC due to expensive in-person sales model, TV ads, and tablet subsidies.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="text-[10px] font-mono text-gray-500 mb-2">LTV:CAC RATIO (EST.)</div>
+                        <div class="font-mono text-3xl font-bold text-accent-red"><1x</div>
+                        <p class="text-[10px] text-gray-600 mt-2">Lifetime value of a customer was likely lower than acquisition cost. The fundamental flaw.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="text-[10px] font-mono text-gray-500 mb-2">GROSS MARGIN (EST.)</div>
+                        <div class="font-mono text-3xl font-bold text-accent-amber">~20-25%</div>
+                        <p class="text-[10px] text-gray-600 mt-2">Tablet-heavy model has hardware costs eating into margins. Content-only would be higher.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="text-[10px] font-mono text-gray-500 mb-2">TOTAL DEBT</div>
+                        <div class="font-mono text-3xl font-bold text-accent-red">$1.2B</div>
+                        <p class="text-[10px] text-gray-600 mt-2">Taken to fund acquisitions. Now in default. US lenders seeking asset control.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="text-[10px] font-mono text-gray-500 mb-2">PAID CUSTOMER RETENTION</div>
+                        <div class="font-mono text-3xl font-bold text-accent-amber">Low</div>
+                        <p class="text-[10px] text-gray-600 mt-2">High refund requests, cancellation difficulties, and product dissatisfaction led to poor retention.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider max-w-[1280px] mx-auto"></div>
+
+        <!-- DOWNFALL -->
+        <section id="downfall" class="px-6 py-24 md:py-32">
+            <div class="max-w-[1280px] mx-auto section-reveal">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="font-mono text-[10px] text-accent-red tracking-widest uppercase">06</span>
+                    <div class="h-px w-12 bg-accent-red/30"></div>
+                    <span class="font-mono text-[10px] text-gray-500 tracking-widest uppercase">The Downfall</span>
+                </div>
+                <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tighter mb-4">Five Fatal Flaws</h2>
+                <p class="text-sm text-gray-500 mb-12 max-w-[600px] leading-relaxed">The collapse wasn't caused by one event — it was a cascading failure of five interconnected structural weaknesses.</p>
+
+                <div class="space-y-4 mb-16">
+                    <div class="glass-panel rounded-xl p-6 metric-card">
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-lg bg-accent-red/10 flex items-center justify-center flex-shrink-0">
+                                <span class="font-mono text-sm font-bold text-accent-red">01</span>
+                            </div>
+                            <div>
+                                <h3 class="font-display text-base font-medium mb-2">Broken Unit Economics From Day One</h3>
+                                <p class="text-xs text-gray-400 leading-relaxed">The in-person sales model was inherently expensive. Each salesman cost more in salary, incentives, and travel than the net revenue they generated. After marketing, product, and overhead costs, every sale was a net loss. The company grew revenue but never fixed the fundamental math.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-6 metric-card">
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-lg bg-accent-red/10 flex items-center justify-center flex-shrink-0">
+                                <span class="font-mono text-sm font-bold text-accent-red">02</span>
+                            </div>
+                            <div>
+                                <h3 class="font-display text-base font-medium mb-2">The Online-Only Delusion</h3>
+                                <p class="text-xs text-gray-400 leading-relaxed">BYJU'S assumed COVID had permanently shifted education online. They were wrong. Students returned to offline classes for accountability, focus, and social interaction. Parents realized online learning led to distractions (YouTube, social media, chatting). The $200M offline pivot in late 2022 was a tacit admission of failure — but too late.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-6 metric-card">
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-lg bg-accent-red/10 flex items-center justify-center flex-shrink-0">
+                                <span class="font-mono text-sm font-bold text-accent-red">03</span>
+                            </div>
+                            <div>
+                                <h3 class="font-display text-base font-medium mb-2">Velocity Over Viability — Growth Addiction</h3>
+                                <p class="text-xs text-gray-400 leading-relaxed">Every dollar of funding was deployed for growth — acquisitions, hiring, marketing — not for building a sustainable business. The company optimized for valuation multiples instead of profitability. When the funding stopped post-COVID, there was no profitable core business to fall back on.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-6 metric-card">
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-lg bg-accent-red/10 flex items-center justify-center flex-shrink-0">
+                                <span class="font-mono text-sm font-bold text-accent-red">04</span>
+                            </div>
+                            <div>
+                                <h3 class="font-display text-base font-medium mb-2">Reckless Acquisitions at Premium Prices</h3>
+                                <p class="text-xs text-gray-400 leading-relaxed">$2.35B+ spent on acquisitions, many at inflated valuations driven by the same COVID-era hype. WhiteHat Jr faced backlash. Epic sold at 50% loss. Aakash was overpaid by 20-30%. Most acquired companies remained loss-making post-acquisition. The $1.2B loan taken to fund acquisitions became a death spiral.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-6 metric-card">
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-lg bg-accent-red/10 flex items-center justify-center flex-shrink-0">
+                                <span class="font-mono text-sm font-bold text-accent-red">05</span>
+                            </div>
+                            <div>
+                                <h3 class="font-display text-base font-medium mb-2">Trust Erosion — Sales Ethics Collapse</h3>
+                                <p class="text-xs text-gray-400 leading-relaxed">The aggressive sales model, combined with unreasonable targets, led to widespread mis-selling. Parents felt deceived. Refund promises weren't honored. Social media was flooded with complaints. The brand equity that Byju Raveendran had personally built over 15 years was destroyed in 2 years of hyper-aggressive sales.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Crisis Cascade -->
+                <h3 class="font-display text-xl font-semibold tracking-tight mb-6">The Crisis Cascade (2022-2024)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="glass-panel rounded-xl p-5 metric-card border-l-2 border-l-accent-red">
+                        <div class="font-mono text-[10px] text-gray-500 mb-2">SEP 2022</div>
+                        <p class="text-xs text-gray-300">FY21 results revealed: ₹4,564 Cr loss on ₹2,428 Cr revenue. 80% tablet revenue exposed.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card border-l-2 border-l-accent-red">
+                        <div class="font-mono text-[10px] text-gray-500 mb-2">LATE 2022</div>
+                        <p class="text-xs text-gray-300">Sales model shifted to phone/Zoom. Conversion rates plummeted. 500 offline centers announced.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card border-l-2 border-l-accent-red">
+                        <div class="font-mono text-[10px] text-gray-500 mb-2">2023 H1</div>
+                        <p class="text-xs text-gray-300">Funding dried up completely. VCs went silent. Salaries delayed. Vendor payments stuck.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card border-l-2 border-l-accent-red">
+                        <div class="font-mono text-[10px] text-gray-500 mb-2">2023</div>
+                        <p class="text-xs text-gray-300">US lenders sued for $1.2B default. Demand: control of all assets and subsidiaries.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card border-l-2 border-l-accent-red">
+                        <div class="font-mono text-[10px] text-gray-500 mb-2">APR 2023</div>
+                        <p class="text-xs text-gray-300">Ministry of Corporate Affairs began investigation into financial & governance practices.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card border-l-2 border-l-accent-red">
+                        <div class="font-mono text-[10px] text-gray-500 mb-2">JUN 2023</div>
+                        <p class="text-xs text-gray-300">Employees reduced from 58,000 to <25,000. 33,000+ jobs eliminated in 15 months.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card border-l-2 border-l-accent-red">
+                        <div class="font-mono text-[10px] text-gray-500 mb-2">SEP 2023</div>
+                        <p class="text-xs text-gray-300">BCCI initiated insolvency proceedings against BYJU'S for non-payment of sponsorship fees.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card border-l-2 border-l-accent-red">
+                        <div class="font-mono text-[10px] text-gray-500 mb-2">OCT 2023</div>
+                        <p class="text-xs text-gray-300">ED issued notices accusing BYJU'S of ₹9,000 Cr FEMA violations.</p>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card border-l-2 border-l-accent-red">
+                        <div class="font-mono text-[10px] text-gray-500 mb-2">JAN 2024</div>
+                        <p class="text-xs text-gray-300">Valuation crashed to $225M. 99% wipeout. Only Bengaluru office remains operational.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider max-w-[1280px] mx-auto"></div>
+
+        <!-- CONCLUSION -->
+        <section id="conclusion" class="px-6 py-24 md:py-32">
+            <div class="max-w-[1280px] mx-auto section-reveal">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="font-mono text-[10px] text-accent-red tracking-widest uppercase">07</span>
+                    <div class="h-px w-12 bg-accent-red/30"></div>
+                    <span class="font-mono text-[10px] text-gray-500 tracking-widest uppercase">Conclusion</span>
+                </div>
+                <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tighter mb-12">Lessons Written in Red</h2>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-16">
+                    <div class="glass-panel-green rounded-xl p-8">
+                        <div class="flex items-center gap-2 mb-6">
+                            <span class="iconify text-accent-green" data-icon="lucide:check-circle" data-width="18"></span>
+                            <h3 class="font-display text-base font-medium text-accent-green">What BYJU'S Got Right</h3>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex items-start gap-3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-accent-green mt-1.5 flex-shrink-0"></span>
+                                <p class="text-xs text-gray-400"><span class="text-white font-medium">Content quality was genuinely excellent.</span> Byju's teaching style, 3D animations, and production value were world-class and genuinely helped students learn better.</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-accent-green mt-1.5 flex-shrink-0"></span>
+                                <p class="text-xs text-gray-400"><span class="text-white font-medium">Identified the right market opportunity.</span> India's 25 crore school-going students represented a massive TAM. The insight that parents would pay for better education outcomes was correct.</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-accent-green mt-1.5 flex-shrink-0"></span>
+                                <p class="text-xs text-gray-400"><span class="text-white font-medium">Personal brand as a moat.</span> Byju Raveendran's reputation as a teacher was the single biggest trust factor. The 2013 stadium event showed the power of this brand.</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-accent-green mt-1.5 flex-shrink-0"></span>
+                                <p class="text-xs text-gray-400"><span class="text-white font-medium">Capitalized on COVID perfectly.</span> Making classes free during lockdown was a brilliant user acquisition strategy. They captured maximum demand when it existed.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel-red rounded-xl p-8">
+                        <div class="flex items-center gap-2 mb-6">
+                            <span class="iconify text-accent-red" data-icon="lucide:x-circle" data-width="18"></span>
+                            <h3 class="font-display text-base font-medium text-accent-red">What BYJU'S Got Catastrophically Wrong</h3>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex items-start gap-3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-accent-red mt-1.5 flex-shrink-0"></span>
+                                <p class="text-xs text-gray-400"><span class="text-white font-medium">Confused distribution with product-market fit.</span> High sales conversions via psychological pressure ≠ genuine demand for the product. The "never-failing sales trick" masked the lack of organic retention.</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-accent-red mt-1.5 flex-shrink-0"></span>
+                                <p class="text-xs text-gray-400"><span class="text-white font-medium">Never solved unit economics.</span> Instead of fixing the broken per-sale math, they doubled down on volume — a classic "lose money on every sale but make it up in volume" delusion.</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-accent-red mt-1.5 flex-shrink-0"></span>
+                                <p class="text-xs text-gray-400"><span class="text-white font-medium">Mistaken permanent shift for temporary shock.</span> COVID was a demand accelerant, not a paradigm change. Building a $22B strategy on a temporary behavior change was the fatal error.</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-accent-red mt-1.5 flex-shrink-0"></span>
+                                <p class="text-xs text-gray-400"><span class="text-white font-medium">Destroyed their own brand.</span> 15 years of teaching credibility was burned in 2 years of mis-selling. The trust deficit became impossible to repair.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Final Verdict -->
+                <div class="glass-panel rounded-xl p-8 md:p-10 mb-12">
+                    <div class="text-center mb-8">
+                        <span class="tag bg-accent-red/10 text-accent-red border border-accent-red/20 mb-4 inline-block">Final Verdict</span>
+                    </div>
+                    <blockquote class="text-center max-w-[700px] mx-auto">
+                        <p class="font-display text-xl md:text-2xl font-medium tracking-tight leading-snug text-gray-200">
+                            "BYJU'S didn't fail because online education doesn't work. It failed because it was never really an education company — it was a <span class="text-accent-red">growth-hacking experiment</span> that used education as the payload. When the venture capital gravity reversed, there was no real business underneath the valuation."
+                        </p>
+                    </blockquote>
+                </div>
+
+                <!-- Key Takeaways for Founders & Investors -->
+                <h3 class="font-display text-xl font-semibold tracking-tight mb-6">Key Takeaways</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="iconify text-accent-amber" data-icon="lucide:lightbulb" data-width="16"></span>
+                            <span class="text-xs font-medium text-accent-amber">For Founders</span>
+                        </div>
+                        <ul class="space-y-2">
+                            <li class="flex items-start gap-2">
+                                <span class="text-gray-600 mt-0.5">→</span>
+                                <span class="text-[11px] text-gray-400">Unit economics must work at Day 1 scale, not "someday" scale</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-gray-600 mt-0.5">→</span>
+                                <span class="text-[11px] text-gray-400">Don't mistake a temporary demand shock for a permanent market shift</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-gray-600 mt-0.5">→</span>
+                                <span class="text-[11px] text-gray-400">Sales velocity without retention is just burning cash faster</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-gray-600 mt-0.5">→</span>
+                                <span class="text-[11px] text-gray-400">Your brand is your most valuable asset — protect it ruthlessly</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 metric-card">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="iconify text-accent-blue" data-icon="lucide:search" data-width="16"></span>
+                            <span class="text-xs font-medium text-accent-blue">For Investors</span>
+                        </div>
+                        <ul class="space-y-2">
+                            <li class="flex items-start gap-2">
+                                <span class="text-gray-600 mt-0.5">→</span>
+                                <span class="text-[11px] text-gray-400">Revenue quality matters more than revenue quantity (80% tablet = red flag)</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-gray-600 mt-0.5">→</span>
+                                <span class="text-[11px] text-gray-400">FOMO-driven investing in hype cycles destroys capital</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-gray-600 mt-0.5">→</span>
+                                <span class="text-[11px] text-gray-400">Demand audit: Is the demand organic or manufactured through sales force?</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-gray-600 mt-0.5">→</span>
+                                <span class="text-[11px] text-gray-400">Growth funded by debt + equity + advance customer payments = house of cards</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="px-6 py-16 border-t border-white/[0.04]">
+            <div class="max-w-[1280px] mx-auto">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-accent-red/20 flex items-center justify-center">
+                            <span class="font-display font-bold text-accent-red text-sm">B</span>
+                        </div>
+                        <span class="font-display text-sm font-medium text-gray-400">BYJU'S Case Study</span>
+                    </div>
+                    <div class="text-[10px] font-mono text-gray-600 text-center">
+                        Data sourced from: BYJU'S FY21 earnings report, EPFO records, media reports, investor disclosures<br>
+                        Some figures are estimates based on available public data. Designed for educational analysis purposes.
+                    </div>
+                    <div class="text-[10px] font-mono text-gray-600">
+                        2024 · POST-MORTEM ANALYSIS
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+        // Intersection Observer for section reveals
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        document.querySelectorAll('.section-reveal').forEach(el => observer.observe(el));
+
+        // Chart.js defaults
+        Chart.defaults.color = '#555';
+        Chart.defaults.borderColor = 'rgba(255,255,255,0.04)';
+        Chart.defaults.font.family = "'JetBrains Mono', monospace";
+        Chart.defaults.font.size = 10;
+        Chart.defaults.plugins.legend.display = false;
+
+        // 1. Valuation Chart
+        new Chart(document.getElementById('valuationChart'), {
+            type: 'line',
+            data: {
+                labels: ['2013', '2015', '2016', '2018', 'Mar 20', 'Dec 20', 'Mar 21', 'Oct 21', 'Mar 22', 'Jan 24'],
+                datasets: [{
+                    data: [0.008, 0.1, 0.5, 1.0, 8, 12, 13.5, 18, 22, 0.225],
+                    borderColor: '#ff003c',
+                    backgroundColor: 'rgba(255,0,60,0.08)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#ff003c',
+                    pointBorderColor: '#ff003c',
+                    pointHoverRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: v => '$' + v + 'B'
+                        },
+                        grid: { color: 'rgba(255,255,255,0.03)' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: '#111',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        titleFont: { family: "'JetBrains Mono', monospace", size: 10 },
+                        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+                        callbacks: {
+                            label: ctx => '$' + ctx.parsed.y + 'B'
+                        }
+                    }
+                }
+            }
+        });
+
+        // 2. EdTech Funding Chart
+        new Chart(document.getElementById('edtechFundingChart'), {
+            type: 'bar',
+            data: {
+                labels: ['2019', '2020', '2021'],
+                datasets: [
+                    {
+                        label: 'BYJU\'S',
+                        data: [200, 1100, 2080],
+                        backgroundColor: '#ff003c',
+                        borderRadius: 3,
+                        barPercentage: 0.6,
+                    },
+                    {
+                        label: 'Rest of EdTech',
+                        data: [229, 1120, 2085],
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        borderRadius: 3,
+                        barPercentage: 0.6,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { display: false }, stacked: false },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => '$' + v + 'M' },
+                        grid: { color: 'rgba(255,255,255,0.03)' }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        align: 'end',
+                        labels: {
+                            boxWidth: 8,
+                            boxHeight: 8,
+                            usePointStyle: true,
+                            pointStyle: 'rectRounded',
+                            padding: 16,
+                            font: { size: 9, family: "'JetBrains Mono', monospace" }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#111',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y + 'M'
+                        }
+                    }
+                }
+            }
+        });
+
+        // 3. Employee Chart
+        new Chart(document.getElementById('employeeChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Mar 2022', 'Jun 2023'],
+                datasets: [{
+                    data: [58000, 25000],
+                    backgroundColor: ['#ff003c', 'rgba(255,0,60,0.3)'],
+                    borderRadius: 6,
+                    barPercentage: 0.4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { callback: v => (v/1000) + 'K' },
+                        grid: { color: 'rgba(255,255,255,0.03)' }
+                    },
+                    y: { grid: { display: false } }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: '#111',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: ctx => ctx.parsed.x.toLocaleString() + ' employees'
+                        }
+                    }
+                }
+            }
+        });
+
+        // 4. Revenue Mix Donut
+        new Chart(document.getElementById('revenueMixChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Tablet Sales', 'Course Fees & Streaming'],
+                datasets: [{
+                    data: [80, 20],
+                    backgroundColor: ['#ff003c', 'rgba(255,255,255,0.1)'],
+                    borderColor: ['rgba(255,0,60,0.3)', 'rgba(255,255,255,0.05)'],
+                    borderWidth: 1,
+                    hoverOffset: 8,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 8,
+                            boxHeight: 8,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            padding: 20,
+                            font: { size: 10, family: "'JetBrains Mono', monospace" },
+                            color: '#888'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#111',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: ctx => ctx.label + ': ' + ctx.parsed + '%'
+                        }
+                    }
+                }
+            }
+        });
+
+        // 5. Unit Economics Waterfall
+        new Chart(document.getElementById('unitEconChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Gross Sales\n(per month)', 'After Sales\nCost', 'After Mktg\n& Product', 'Net Margin\n(per rep)', 'After Overheads\n& Rent'],
+                datasets: [{
+                    data: [276000, 160000, 57000, -40000, -80000],
+                    backgroundColor: (ctx) => {
+                        const values = [276000, 160000, 57000, -40000, -80000];
+                        return values[ctx.dataIndex] >= 0 ? 'rgba(255,255,255,0.15)' : '#ff003c';
+                    },
+                    borderRadius: 4,
+                    barPercentage: 0.5,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        ticks: {
+                            callback: v => '₹' + (v/1000) + 'K'
+                        },
+                        grid: { color: 'rgba(255,255,255,0.03)' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            font: { size: 9 },
+                            maxRotation: 0,
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: '#111',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: ctx => '₹' + Math.abs(ctx.parsed.y).toLocaleString('en-IN')
+                        }
+                    }
+                }
+            }
+        });
+
+        // 6. Revenue vs Loss
+        new Chart(document.getElementById('revenueLossChart'), {
+            type: 'bar',
+            data: {
+                labels: ['FY2021'],
+                datasets: [
+                    {
+                        label: 'Revenue',
+                        data: [2428],
+                        backgroundColor: 'rgba(0,255,157,0.4)',
+                        borderRadius: 4,
+                        barPercentage: 0.5,
+                    },
+                    {
+                        label: 'Loss',
+                        data: [4564],
+                        backgroundColor: '#ff003c',
+                        borderRadius: 4,
+                        barPercentage: 0.5,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => '₹' + v + ' Cr' },
+                        grid: { color: 'rgba(255,255,255,0.03)' }
+                    },
+                    x: { grid: { display: false } }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        align: 'end',
+                        labels: {
+                            boxWidth: 8,
+                            boxHeight: 8,
+                            usePointStyle: true,
+                            pointStyle: 'rectRounded',
+                            padding: 16,
+                            font: { size: 9, family: "'JetBrains Mono', monospace" }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#111',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: ctx => ctx.dataset.label + ': ₹' + ctx.parsed.y.toLocaleString('en-IN') + ' Cr'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Smooth scroll for nav
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Active nav highlight
+        const sections = document.querySelectorAll('section[id]');
+        const navItems = document.querySelectorAll('.nav-item');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (window.scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href') === '#' + current) {
+                    item.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
